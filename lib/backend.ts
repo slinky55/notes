@@ -1,4 +1,12 @@
-import PocketBase from 'pocketbase'
+import { PrismaClient } from '@prisma/client'
 
-export const pocketbase = new PocketBase('http://127.0.0.1:8090');
+export const prisma = new PrismaClient();
 
+async function createNote(_title: string, _contents: string) {
+    await prisma.note.create({
+        data: {
+            title: _title,
+            content: _contents,
+        }
+    })
+}
