@@ -1,42 +1,41 @@
-
-import { useForm } from 'react-hook-form'
 import Router from 'next/router'
 
 import { toast } from 'react-hot-toast'
+import { GoogleLoginButton } from 'react-social-login-buttons';
 
-import { pocketbase } from '../../lib/backend'
+import { firebaseAuth, db, googleProvider } from '../../lib/firebase'
+import { signInWithPopup } from 'firebase/auth';
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 import styles from "../../styles/Login.module.css"
 
-async function login(username: string, password: string) {
-    await pocketbase.users.authViaEmail(username, password)
-        .then((userData) => {
-            return userData;
-        });
-}
-
 export default function LoginPage() {
-    const { register, handleSubmit, watch, formState: {errors}} = useForm();
+    const signInWithGoogle = async () => {
+        signInWithPopup(firebaseAuth, googleProvider)
+            .then( async (res) => {
+                const user = res.user;
 
-    const onSubmit = async (data: any) => {
-        console.log(login(data.username, data.password));
+                const docSnap = await getDoc(doc(db, "Users", user.uid));
+                if (!docSnap.exists()) {
+                    await setDoc(doc(db, "Users", user.uid), {
+                        uid: user.uid,
+                        photoURL: user.photoURL,
+                        displayName: user.displayName,
+                    });
+                }
+
+                Router.push("/profile");
+                toast.success(`Logged in as ${user.displayName}`)
+            }).catch( (err) => {
+                toast.error(err.message);
+            });
     }
 
     return (
         <div className={styles.loginContainer}>
-            <form onSubmit={handleSubmit(onSubmit)}>
-                <div className={styles.inputContainer}>
-                    <label>Email</label>
-                    <input type="text" placeholder="email@example.com" {...register("email", { required: true })} />
-                    {errors.email ? <span>This field is required</span> : (<span></span>) }
-                </div>
-                <div className={styles.inputContainer}>
-                    <label>Password</label>
-                    <input type="password" {...register("password", { required: true })} />
-                    {errors.password ? <span>This field is required</span> : (<span></span>) }
-                </div>
-                <input type="submit" value="Login"/>
-            </form> 
+            <div className={styles.buttonContainer}>
+                <GoogleLoginButton onClick={signInWithGoogle}/>
+            </div>
         </div>
     );
 }

@@ -7,29 +7,3 @@
     justify-content: center;
     align-items: center;
 }
-
-.loginContainer
-form {
-    display: flex;
-    flex-direction: column;
-
-    gap: 0.5em;
-
-    font-family: inherit;
-}
-
-.loginContainer
-input {
-    font-family: inherit;
-}
-
-.inputContainer {
-    display: flex;
-
-    flex-direction: column;
-}
-
-.inputContainer
-span {
-    color: red;
-}
