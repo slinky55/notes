@@ -87,7 +87,7 @@ func AuthUser(db *gorm.DB, c *gin.Context) (User, Claims, error) {
 	}
 
 	var user User
-	res := db.First(&user, claims)
+	res := db.First(&user, claims.ID)
 
 	if res.Error != nil {
 		log.Println(res.Error)
