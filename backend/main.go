@@ -69,7 +69,7 @@ func AuthUser(db *gorm.DB, c *gin.Context) (User, Claims, error) {
 	cookie, err := c.Cookie("jwt")
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "no cookie",
+			"error": err.Error(),
 		})
 		return User{}, Claims{}, err
 	}
@@ -80,9 +80,12 @@ func AuthUser(db *gorm.DB, c *gin.Context) (User, Claims, error) {
 		func(token *jwt.Token) (interface{}, error) {
 			return jwtKey, nil
 		})
+
 	if err != nil || !token.Valid {
 		log.Println("Invalid token.")
-		c.AbortWithStatus(http.StatusUnauthorized)
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": err.Error(),
+		})
 		return User{}, Claims{}, err
 	}
 
@@ -91,7 +94,9 @@ func AuthUser(db *gorm.DB, c *gin.Context) (User, Claims, error) {
 
 	if res.Error != nil {
 		log.Println(res.Error)
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": res.Error.Error(),
+		})
 		return User{}, Claims{}, res.Error
 	}
 
@@ -119,7 +124,7 @@ func main() {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Cookie"},
 		AllowCredentials: true,
 		AllowWildcard:    true,
 	}))
@@ -131,12 +136,65 @@ func main() {
 				"message": "pong",
 			})
 		})
-		api.POST("/note/create", func(c *gin.Context) {
+		api.GET("/user/notes", func(c *gin.Context) {
 			user, _, err := AuthUser(db, c)
 			if err != nil {
 				c.JSON(http.StatusUnauthorized, gin.H{
 					"error": err.Error(),
 				})
+				return
+			}
+
+			var notes []Note
+			err = db.Model(&user).Association("Notes").Find(&notes)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": err.Error(),
+				})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"notes": notes,
+			})
+		})
+		api.GET("/user/profile", func(c *gin.Context) {
+			user, _, err := AuthUser(db, c)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error": err.Error(),
+				})
+				return
+			}
+
+			var notes []Note
+			err = db.Model(&user).Association("Notes").Find(&notes)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": err.Error(),
+				})
+				return
+			}
+
+			var data struct {
+				ID    uint   `json:"id"`
+				Name  string `json:"name"`
+				Email string `json:"email"`
+			}
+
+			data.ID = user.ID
+			data.Name = user.Name
+			data.Email = user.Email
+
+			c.JSON(http.StatusOK, gin.H{
+				"user":  data,
+				"notes": notes,
+			})
+		})
+
+		api.POST("/note/create", func(c *gin.Context) {
+			user, _, err := AuthUser(db, c)
+			if err != nil {
 				return
 			}
 
@@ -219,6 +277,7 @@ func main() {
 			}
 
 			claims := &Claims{
+				ID:    user.ID,
 				Name:  user.Name,
 				Email: user.Email,
 				StandardClaims: jwt.StandardClaims{
@@ -247,28 +306,6 @@ func main() {
 				true)
 			c.JSON(http.StatusOK, gin.H{
 				"message": "success",
-			})
-		})
-		api.GET("/user/notes", func(c *gin.Context) {
-			user, _, err := AuthUser(db, c)
-			if err != nil {
-				c.JSON(http.StatusUnauthorized, gin.H{
-					"error": err.Error(),
-				})
-				return
-			}
-
-			var notes []Note
-			err = db.Model(&user).Association("Notes").Find(&notes)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error": err.Error(),
-				})
-				return
-			}
-
-			c.JSON(http.StatusOK, gin.H{
-				"notes": notes,
 			})
 		})
 	}
